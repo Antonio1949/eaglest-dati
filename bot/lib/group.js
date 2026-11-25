@@ -28,6 +28,11 @@
     const signature = r => [r.date.slice(0, 10), r.courseId, r.holesType,
         r.players.map(p => p.name.trim().toLowerCase()).sort().join('|')].join('#');
 
+    const SAME_ROUND_MS = 3 * 3600 * 1000;   // stessa partita: iniziata a meno di 3 ore (9 buche al mattino e 9 al pomeriggio restano due)
+
+    /** Stessa partita registrata da due telefoni: stessa giornata, campo, tipo di giro e giocatori, iniziate a meno di 3 ore. */
+    const sameRound = (a, b) => signature(a) === signature(b) && Math.abs(Date.parse(a.date) - Date.parse(b.date)) < SAME_ROUND_MS;
+
     function validRound(r) {
         return r && typeof r.id === 'string' && r.id.length <= 40 && !Number.isNaN(Date.parse(r.date))
             && typeof r.courseId === 'string' && ['18', '9_out', '9_in'].includes(r.holesType)
@@ -44,8 +49,7 @@
         if (!payload || payload.type !== 'round' || !validRound(payload.round)) return { error: 'invio non valido' };
         const round = { ...payload.round, closed: true };
         const rounds = { ...(store.rounds || {}) };
-        const sig = signature(round);
-        const replaced = Object.keys(rounds).filter(id => id === round.id || signature(rounds[id].round) === sig);
+        const replaced = Object.keys(rounds).filter(id => id === round.id || sameRound(rounds[id].round, round));
         replaced.forEach(id => delete rounds[id]);
         rounds[round.id] = { round, device: String(payload.device || '').slice(0, 40), at };
         return { store: { v: 1, updated: at, rounds }, replaced };
@@ -72,8 +76,7 @@
             };
         }).filter(Boolean);
         // fuori: le partite che il gruppo ha (stesso codice o doppione) e quelle arrivate dal gruppo e poi tolte
-        const groupSigs = new Set(group.map(signature));
-        const kept = history.filter(r => !r.fromGroup && !groupIds.has(r.id) && !groupSigs.has(signature(r)));
+        const kept = history.filter(r => !r.fromGroup && !groupIds.has(r.id) && !group.some(g => sameRound(g, r)));
         return [...kept, ...mine.map(r => ({ ...r, fromGroup: true }))]
             .sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
     }
