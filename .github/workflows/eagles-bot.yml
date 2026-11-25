@@ -1,0 +1,45 @@
+# Eagles Bot: unisce ogni invio (issue cifrata) allo storico di gruppo, lo pubblica e chiude l'issue.
+name: Eagles Bot
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+# un invio alla volta: due partite arrivate insieme non si sovrascrivono
+concurrency:
+  group: eagles-bot
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Unisce l'invio allo storico
+        env:
+          GROUP_KEY: ${{ secrets.GROUP_KEY }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AT: ${{ github.event.issue.created_at }}
+        run: node bot/bot.mjs
+
+      - name: Pubblica lo storico
+        run: |
+          git config user.name "Eagles Bot"
+          git config user.email "eagles-bot@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || { git commit -m "Eagles Bot: invio #${{ github.event.issue.number }}" && git push; }
+
+      - name: Chiude l'issue con l'esito
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }} --comment "$(cat outcome.txt 2>/dev/null || echo 'errore del bot')"
