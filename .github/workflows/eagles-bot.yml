@@ -1,4 +1,4 @@
-# Eagles Bot: unisce ogni invio (issue cifrata) allo storico di gruppo, lo pubblica e chiude l'issue.
+# Eagles Bot: applica ogni invio (issue cifrata: partita o rubrica) ai dati del gruppo, li pubblica e chiude l'issue.
 name: Eagles Bot
 
 on:
@@ -27,6 +27,7 @@ jobs:
       - name: Unisce l'invio allo storico
         env:
           GROUP_KEY: ${{ secrets.GROUP_KEY }}
+          ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_AT: ${{ github.event.issue.created_at }}
         run: node bot/bot.mjs
